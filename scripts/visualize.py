@@ -29,20 +29,20 @@ def main():
     # -----------------------------
     # User input filters
     # -----------------------------
-    unique_trucks = df_filtered["DeviceName"].unique()
-    unique_zones = df_filtered["NearestZone"].unique()
-
-    print("Available trucks:", unique_trucks)
-    print("Available zones:", unique_zones)
-
-    # Example: filter by specific truck or zone
-    truck_filter = input("Enter truck license plate to filter (or leave blank for all): ").strip()
-    zone_filter = input("Enter zone name to filter (or leave blank for all): ").strip()
-
-    if truck_filter:
-        df_filtered = df_filtered[df_filtered["DeviceName"] == truck_filter]
-    if zone_filter:
-        df_filtered = df_filtered[df_filtered["NearestZone"] == zone_filter]
+    # Uncomment this block to filter the visualization by truck or zone.
+    # unique_trucks = df_filtered["DeviceName"].unique()
+    # unique_zones = df_filtered["NearestZone"].unique()
+    #
+    # print("Available trucks:", unique_trucks)
+    # print("Available zones:", unique_zones)
+    #
+    # truck_filter = input("Enter truck license plate to filter (or leave blank for all): ").strip()
+    # zone_filter = input("Enter zone name to filter (or leave blank for all): ").strip()
+    #
+    # if truck_filter:
+    #     df_filtered = df_filtered[df_filtered["DeviceName"] == truck_filter]
+    # if zone_filter:
+    #     df_filtered = df_filtered[df_filtered["NearestZone"] == zone_filter]
 
     print(f"Records after filtering: {len(df_filtered)}")
     if df_filtered.empty:

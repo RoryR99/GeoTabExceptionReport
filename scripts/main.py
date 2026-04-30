@@ -6,6 +6,7 @@ from scripts.geotab_client import connect_to_geotab
 from scripts.extract import fetch_zones, fetch_trips
 from scripts.transform import create_trips_gdf, create_zones_gdf, spatial_join_nearest
 from scripts.load import export_csv
+from scripts.visualize import main as generate_visual_outputs
 
 
 def main():
@@ -75,6 +76,12 @@ def main():
         logger.info(f"Average distance to nearest zone: {avg_distance:.2f} km")
         logger.info("Workflow completed successfully")
         logger.info("="*60)
+
+        # -----------------------------
+        # Generate Map / Report
+        # -----------------------------
+        logger.info("Generating map and report outputs")
+        generate_visual_outputs()
 
     except Exception as e:
         logger.exception(f"Workflow failed: {e}")
