@@ -1,0 +1,6 @@
+python -m venv myenv
+venv\Scripts\activate
+python -m pip install pandas geopandas shapely mygeotab python-dotenv pytest matplotlib contextily folium
+pip install -r requirements.txt
+python -m scripts.main
+python -m scripts.visualize
