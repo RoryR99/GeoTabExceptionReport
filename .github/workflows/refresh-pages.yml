@@ -1,0 +1,77 @@
+name: Refresh GeoTab Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Trip look-back window in days"
+        required: false
+        default: "30"
+  schedule:
+    - cron: "0 * * * *"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: geotab-pages
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install geospatial system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin libgdal-dev
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run GeoTab ETL
+        env:
+          GEOTAB_DATABASE: ${{ secrets.GEOTAB_DATABASE }}
+          GEOTAB_USERNAME: ${{ secrets.GEOTAB_USERNAME }}
+          GEOTAB_PASSWORD: ${{ secrets.GEOTAB_PASSWORD }}
+          GEOTAB_SERVER: ${{ secrets.GEOTAB_SERVER || 'my.geotab.com' }}
+          DAYS_BACK: ${{ github.event.inputs.days || '30' }}
+          GENERATE_HTML_REPORT: "true"
+          GENERATE_FOLIUM_MAP: "true"
+          ALERT_EMAIL_ENABLED: "false"
+        run: python -m scripts.main --days "$DAYS_BACK"
+
+      - name: Prepare Pages artifact
+        run: |
+          test -f reports/etl_report.html
+          test -f reports/trip_map.html
+          touch reports/.nojekyll
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: reports
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

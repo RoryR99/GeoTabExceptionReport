@@ -1,7 +1,13 @@
 .env
+__pycache__/
+*.py[cod]
+
 venv/
 myenv/
-__pycache__/
-*.pyc
+
 logs/
 output/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

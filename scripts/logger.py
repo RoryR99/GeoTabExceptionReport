@@ -1,24 +1,30 @@
+# scripts/logger.py
+
 import logging
+import uuid
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 # Base project directory
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Logs folder
-LOG_DIR = BASE_DIR / "logs"
-LOG_DIR.mkdir(exist_ok=True)
+LOG_DIR  = BASE_DIR / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 log_file = LOG_DIR / "geotab_etl.log"
 
-# Configure logger
-logging.basicConfig(
-    level=logging.INFO,  # captures INFO + WARNING + ERROR
-    format="%(asctime)s | %(levelname)s | %(message)s",
-    handlers=[
-        logging.FileHandler(log_file),
-        logging.StreamHandler()  # logs also to console
-    ]
-)
+# Unique run ID stamped on every log line
+RUN_ID = str(uuid.uuid4())[:8]
 
-logger = logging.getLogger(__name__)
+LOG_FORMAT = f"%(asctime)s | %(levelname)-8s | run={RUN_ID} | %(name)s | %(message)s"
 
+# Root handlers
+_file_handler   = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=5)
+_stream_handler = logging.StreamHandler()
+
+for _h in (_file_handler, _stream_handler):
+    _h.setFormatter(logging.Formatter(LOG_FORMAT))
+
+logging.basicConfig(level=logging.INFO, handlers=[_file_handler, _stream_handler])
+
+logger = logging.getLogger("geotab_etl")
+logger.info(f"Logger initialised — run_id={RUN_ID}, log={log_file}")
