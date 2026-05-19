@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from html import escape
 import os
+import json
 from pathlib import Path
 
 import geopandas as gpd
@@ -146,6 +147,7 @@ def generate_folium_map(
     # ── Outside-zone trip markers ────────────────────────────────────
     outside_layer = folium.FeatureGroup(name="Trips — Outside Zone", show=True)
     cluster = MarkerCluster().add_to(outside_layer)
+    marker_filters = []
 
     for _, trip in outside_gdf.iterrows():
         pt = trip.geometry
@@ -161,6 +163,10 @@ def generate_folium_map(
         device   = trip.get("DeviceName", "N/A")
         plate    = trip.get("LicensePlate", "")
         stop_t   = trip.get("StopTime", "N/A")
+        stop_date = ""
+        stop_t_parsed = pd.to_datetime(stop_t, errors="coerce", utc=True)
+        if pd.notna(stop_t_parsed):
+            stop_date = stop_t_parsed.strftime("%Y-%m-%d")
         after_h  = "Yes" if trip.get("AfterHoursStop") else "No"
         weekend  = "Yes" if trip.get("WeekendStop") else "No"
         long_s   = "Yes" if trip.get("LongStop") else "No"
@@ -195,14 +201,90 @@ def generate_folium_map(
             f"Stop: {stop_dur} min &nbsp;|&nbsp; Dist: {dist_km} km &nbsp;|&nbsp; {day}"
         )
 
-        folium.Marker(
+        marker = folium.Marker(
             location=[pt.y, pt.x],
             icon=folium.Icon(color="darkred" if stop_over else "red", icon=icon_name, prefix="glyphicon"),
             popup=folium.Popup(popup_html, max_width=320),
             tooltip=tooltip_html,
-        ).add_to(cluster)
+        )
+        marker.add_to(cluster)
+        marker_filters.append({
+            "name": marker.get_name(),
+            "date": stop_date,
+            "plate": str(plate).lower(),
+        })
 
     outside_layer.add_to(fmap)
+
+    marker_filters_json = json.dumps(marker_filters)
+    cluster_name = cluster.get_name()
+    fmap.get_root().html.add_child(folium.Element(
+        """
+        <div style="
+            position: fixed;
+            top: 128px;
+            left: 50px;
+            z-index: 9999;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid #cdd9ea;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+            padding: 10px 14px;
+            font-family: Arial, sans-serif;
+            color: #17324d;
+            font-size: 12px;
+            line-height: 1.4;
+        ">
+          <div style="font-weight: 700; color: #1558b0; margin-bottom: 6px;">Filter map stops</div>
+          <label for="mapDateFrom" style="display:block;font-weight:700;margin-top:4px;">From</label>
+          <input id="mapDateFrom" type="date" style="width: 150px; border: 1px solid #cdd9ea; border-radius: 6px; padding: 4px 6px;">
+          <label for="mapDateTo" style="display:block;font-weight:700;margin-top:6px;">To</label>
+          <input id="mapDateTo" type="date" style="width: 150px; border: 1px solid #cdd9ea; border-radius: 6px; padding: 4px 6px;">
+          <label for="mapPlateSearch" style="display:block;font-weight:700;margin-top:6px;">Plate</label>
+          <input id="mapPlateSearch" type="search" placeholder="Search plate" oninput="applyMapFilters()" style="width: 150px; border: 1px solid #cdd9ea; border-radius: 6px; padding: 4px 6px;">
+          <div style="margin-top:8px;">
+            <button type="button" onclick="applyMapFilters()" style="background:#1a73e8;color:white;border:0;border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer;">Apply</button>
+            <button type="button" onclick="clearMapFilters()" style="background:white;color:#6b7e99;border:1px solid #cdd9ea;border-radius:6px;padding:5px 10px;cursor:pointer;">Clear</button>
+          </div>
+          <div id="mapFilterStatus" style="margin-top:6px;color:#1558b0;font-weight:700;"></div>
+        </div>
+        """
+    ))
+    fmap.get_root().script.add_child(folium.Element(
+        f"""
+        const MAP_MARKER_FILTERS = {marker_filters_json};
+        const MAP_CLUSTER = {cluster_name};
+
+        function applyMapFilters() {{
+          const from = document.getElementById('mapDateFrom').value;
+          const to = document.getElementById('mapDateTo').value;
+          const plateQuery = document.getElementById('mapPlateSearch').value.trim().toLowerCase();
+          let visible = 0;
+          MAP_MARKER_FILTERS.forEach(item => {{
+            const marker = window[item.name] || eval(item.name);
+            const date = item.date || '';
+            const plate = item.plate || '';
+            const showDate = (!from || date >= from) && (!to || date <= to);
+            const showPlate = !plateQuery || plate.includes(plateQuery);
+            if (showDate && showPlate) {{
+              visible += 1;
+              if (!MAP_CLUSTER.hasLayer(marker)) MAP_CLUSTER.addLayer(marker);
+            }} else if (MAP_CLUSTER.hasLayer(marker)) {{
+              MAP_CLUSTER.removeLayer(marker);
+            }}
+          }});
+          document.getElementById('mapFilterStatus').textContent = visible + ' stops shown';
+        }}
+
+        function clearMapFilters() {{
+          document.getElementById('mapDateFrom').value = '';
+          document.getElementById('mapDateTo').value = '';
+          document.getElementById('mapPlateSearch').value = '';
+          applyMapFilters();
+          document.getElementById('mapFilterStatus').textContent = '';
+        }}
+        """
+    ))
 
     # ── Heat map layer ───────────────────────────────────────────────
     heat_data = [
@@ -239,8 +321,6 @@ def generate_html_report(
     an interactive date filter, KPI cards, Chart.js bar chart,
     outside-zone stops table, device summary, and zone summary.
     """
-    import json
-
     df = pd.DataFrame(trips_gdf.drop(columns="geometry", errors="ignore"))
     report_window = _format_reporting_window(window_start, window_end)
     map_href = _relative_html_href(FOLIUM_MAP_PATH, output_path)
@@ -266,10 +346,7 @@ def generate_html_report(
     total_trips       = len(df)
     inside_count      = int(df["InsideZone"].sum())       if "InsideZone"     in df.columns else 0
     outside_count     = total_trips - inside_count
-    after_hours_count = int(df["AfterHoursStop"].sum())   if "AfterHoursStop" in df.columns else 0
-    weekend_count     = int(df["WeekendStop"].sum())      if "WeekendStop"    in df.columns else 0
     long_stop_count   = int(df["LongStop"].sum())         if "LongStop"       in df.columns else 0
-    high_idle_count   = int(df["HighIdle"].sum())         if "HighIdle"       in df.columns else 0
     avg_dist          = round(df["DistanceKm"].mean(), 2) if "DistanceKm"     in df.columns else 0
     total_devices     = df["DeviceID"].nunique()           if "DeviceID"       in df.columns else 0
 
@@ -415,6 +492,24 @@ def generate_html_report(
     outline: none;
   }}
   .filter-bar input[type=date]:focus {{ border-color: var(--blue); box-shadow: 0 0 0 2px rgba(26,115,232,.2); }}
+  .table-search {{
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }}
+  .table-search label {{ color: var(--blue-dk); font-weight: 700; font-size: .83rem; }}
+  .table-search input {{
+    min-width: 240px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: .83rem;
+    color: var(--text);
+    background: var(--white);
+    outline: none;
+  }}
+  .table-search input:focus {{ border-color: var(--blue); box-shadow: 0 0 0 2px rgba(26,115,232,.2); }}
   .btn-apply {{
     background: var(--blue); color: var(--white);
     border: none; border-radius: 6px;
@@ -555,10 +650,7 @@ def generate_html_report(
     <div class="kpi neutral"><div class="val" id="kpi-total">{total_trips}</div><div class="lbl">Total Trips</div></div>
     <div class="kpi ok"><div class="val" id="kpi-inside">{inside_count}</div><div class="lbl">Inside Zone</div></div>
     <div class="kpi danger"><div class="val" id="kpi-outside">{outside_count}</div><div class="lbl">Outside Zone</div></div>
-    <div class="kpi warn"><div class="val" id="kpi-afterhours">{after_hours_count}</div><div class="lbl">After-Hours Stops</div></div>
-    <div class="kpi warn"><div class="val" id="kpi-weekend">{weekend_count}</div><div class="lbl">Weekend Stops</div></div>
     <div class="kpi warn"><div class="val" id="kpi-longstop">{long_stop_count}</div><div class="lbl">Long Stops (&gt;60 min)</div></div>
-    <div class="kpi danger"><div class="val" id="kpi-idle">{high_idle_count}</div><div class="lbl">High Idle Events</div></div>
     <div class="kpi neutral"><div class="val" id="kpi-avgdist">{avg_dist}</div><div class="lbl">Avg Dist to Zone (km)</div></div>
     <div class="kpi neutral"><div class="val" id="kpi-devices">{total_devices}</div><div class="lbl">Active Vehicles</div></div>
   </div>
@@ -574,6 +666,10 @@ def generate_html_report(
     <div class="card-header">
       ⚠️ Outside Zone Stops &gt; 10 Minutes
       <span class="badge badge-orange" id="outsideBadge">{len(outside_df)} trips</span>
+      <div class="table-search">
+        <label for="deviceSearch">Device</label>
+        <input type="search" id="deviceSearch" placeholder="Search device name" oninput="applyFilter()">
+      </div>
     </div>
     <div class="card-body">
       <table id="outsideTable">
@@ -635,20 +731,14 @@ function renderOutsideTable(rows) {{
 function updateKPIs(rows) {{
   const total   = rows.length;
   const inside  = rows.filter(r => r.InsideZone).length;
-  const afterH  = rows.filter(r => r.AfterHoursStop).length;
-  const weekend = rows.filter(r => r.WeekendStop).length;
   const longS   = rows.filter(r => r.LongStop).length;
-  const idle    = rows.filter(r => r.HighIdle).length;
   const dists   = rows.map(r => r.DistanceKm).filter(v => v > 0);
   const avgD    = dists.length ? (dists.reduce((a,b)=>a+b,0)/dists.length).toFixed(2) : 0;
   const devs    = new Set(rows.map(r => r.DeviceID)).size;
   document.getElementById('kpi-total').textContent      = total;
   document.getElementById('kpi-inside').textContent     = inside;
   document.getElementById('kpi-outside').textContent    = total - inside;
-  document.getElementById('kpi-afterhours').textContent = afterH;
-  document.getElementById('kpi-weekend').textContent    = weekend;
   document.getElementById('kpi-longstop').textContent   = longS;
-  document.getElementById('kpi-idle').textContent       = idle;
   document.getElementById('kpi-avgdist').textContent    = avgD;
   document.getElementById('kpi-devices').textContent    = devs;
 }}
@@ -656,20 +746,23 @@ function updateKPIs(rows) {{
 function applyFilter() {{
   const from = document.getElementById('dateFrom').value;
   const to   = document.getElementById('dateTo').value;
+  const deviceQuery = document.getElementById('deviceSearch').value.trim().toLowerCase();
   const filtAll = ALL_ROWS.filter(r => (!from || r._StopDate >= from) && (!to || r._StopDate <= to));
   const filtOut = OUT_ROWS.filter(r => {{
     const d = (r.StopTime || '').slice(0, 10);
-    return (!from || d >= from) && (!to || d <= to);
+    const deviceName = (r.DeviceName || '').toString().toLowerCase();
+    return (!from || d >= from) && (!to || d <= to) && (!deviceQuery || deviceName.includes(deviceQuery));
   }});
   updateKPIs(filtAll);
   renderOutsideTable(filtOut);
   document.getElementById('filter-status').textContent =
-    (from || to) ? `Showing ${{filtAll.length}} of ${{ALL_ROWS.length}} trips` : '';
+    (from || to || deviceQuery) ? `Showing ${{filtOut.length}} outside-zone stops; ${{filtAll.length}} of ${{ALL_ROWS.length}} trips in date range` : '';
 }}
 
 function clearFilter() {{
   document.getElementById('dateFrom').value = '{date_min}';
   document.getElementById('dateTo').value   = '{date_max}';
+  document.getElementById('deviceSearch').value = '';
   updateKPIs(ALL_ROWS);
   renderOutsideTable(OUT_ROWS);
   document.getElementById('filter-status').textContent = '';
