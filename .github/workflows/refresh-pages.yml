@@ -6,7 +6,7 @@ on:
       days:
         description: "Trip look-back window in days"
         required: false
-        default: "30"
+        default: "7"
   schedule:
     - cron: "0 * * * *"
 
