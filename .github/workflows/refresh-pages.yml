@@ -49,7 +49,7 @@ jobs:
           GEOTAB_USERNAME: ${{ secrets.GEOTAB_USERNAME }}
           GEOTAB_PASSWORD: ${{ secrets.GEOTAB_PASSWORD }}
           GEOTAB_SERVER: ${{ secrets.GEOTAB_SERVER || 'my.geotab.com' }}
-          DAYS_BACK: ${{ github.event.inputs.days || '30' }}
+          DAYS_BACK: ${{ github.event.inputs.days || '7' }}
           GENERATE_HTML_REPORT: "true"
           GENERATE_FOLIUM_MAP: "true"
           ALERT_EMAIL_ENABLED: "false"
