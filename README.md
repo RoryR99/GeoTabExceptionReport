@@ -108,6 +108,8 @@ python -m scripts.main --help
 | `FarFromZone` | Trip more than N km from any zone |
 | `OutsideAndStopped` | Outside zone AND stopped > threshold |
 | `SpeedKmh` | Estimated average trip speed |
+| `Wave` | Epicor Wave value matched by GeoTab device ID, when Epicor enrichment is configured |
+| `Customer` | Epicor Customer value matched by GeoTab device ID, when Epicor enrichment is configured |
 
 ---
 
@@ -130,6 +132,16 @@ Key thresholds:
 | `AFTER_HOURS_START` | 18 | After-hours start (24h) |
 | `FAR_FROM_ZONE_THRESHOLD_KM` | 5.0 | Flag trips farther than this |
 | `API_MAX_RETRIES` | 3 | API call retry attempts |
+
+Optional Epicor Wave/Customer enrichment:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `EPICOR_BASE_URL` | Epicor SaaS API URL | Base Epicor REST API URL |
+| `EPICOR_USERNAME` | unset | Epicor username; leave unset to skip Wave enrichment |
+| `EPICOR_PASSWORD` | unset | Epicor password; leave unset to skip Wave enrichment |
+| `EPICOR_BAQ_INTEGRATION` | `GeoTabIntegration-RR` | BAQ used to map GeoTab device IDs to Wave and Customer |
+| `EPICOR_BAQ_WAVE_TRACK` | `GeoWaveDeviceTrack` | BAQ joined by Wave number for customer details |
 
 When you provide `--start-date` and `--end-date` (or set `TRIP_START_DATE` and `TRIP_END_DATE`), the pipeline uses that exact date frame instead of calculating `now - DAYS_BACK`. Date-only values are expanded to full UTC-day boundaries. Both the HTML report and the Folium map display and use that same resolved window.
 

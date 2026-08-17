@@ -34,6 +34,7 @@ from scripts.load import export_all
 from scripts.validate import validate_zones, validate_trips, validate_results
 from scripts.visualize import generate_folium_map, generate_html_report
 from scripts.alerts import send_summary_email
+from scripts.EpiWave import enrich_with_wave, fetch_wave_lookup
 
 
 # ─────────────────────────────────────────────
@@ -132,6 +133,9 @@ def main() -> None:
 
         results_gdf = spatial_join_nearest(trips_gdf, zones_gdf)
         results_gdf = engineer_features(results_gdf)
+        wave_lookup = fetch_wave_lookup()
+        if wave_lookup:
+            results_gdf = enrich_with_wave(results_gdf, wave_lookup)
 
         device_summary = build_device_summary(results_gdf)
         zone_summary   = build_zone_summary(results_gdf)

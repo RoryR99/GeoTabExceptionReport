@@ -288,8 +288,13 @@ def build_device_summary(gdf: gpd.GeoDataFrame) -> pd.DataFrame:
 
     df = pd.DataFrame(gdf.drop(columns="geometry", errors="ignore"))
 
+    group_columns = ["DeviceID", "DeviceName"]
+    for optional_column in ["Wave", "Customer"]:
+        if optional_column in df.columns:
+            group_columns.append(optional_column)
+
     agg = (
-        df.groupby(["DeviceID", "DeviceName"])
+        df.groupby(group_columns)
         .agg(
             TotalTrips          =("TripID",            "count"),
             TotalDistanceKm     =("Distance",          "sum"),
