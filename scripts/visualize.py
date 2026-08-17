@@ -161,6 +161,8 @@ def generate_folium_map(
         dist_km  = trip.get("DistanceKm", "N/A")
         nearest  = trip.get("NearestZone", "N/A")
         device   = trip.get("DeviceName", "N/A")
+        wave     = trip.get("Wave", "")
+        customer = trip.get("Customer", "")
         plate    = trip.get("LicensePlate", "")
         stop_t   = trip.get("StopTime", "N/A")
         stop_date = ""
@@ -181,6 +183,8 @@ def generate_folium_map(
             f"<span style='color:#777'>Plate: {plate}</span>"
             f"<hr style='margin:6px 0'>"
             f"<b>Nearest Customer:</b> {nearest}<br>"
+            f"<b>Wave:</b> {wave or 'N/A'}<br>"
+            f"<b>Wave Customer:</b> {customer or 'N/A'}<br>"
             f"<b>Distance to Zone:</b> {dist_km} km<br>"
             f"<hr style='margin:6px 0'>"
             f"<b>Stop Time:</b> {stop_t}<br>"
@@ -362,7 +366,7 @@ def generate_html_report(
 
     # ── Outside-zone + stopped >10 min table ─────────────────────────
     OUTSIDE_COLS = [
-        "DeviceName", "LicensePlate", "NearestZone", "DistanceKm",
+        "DeviceName", "LicensePlate", "Wave", "Customer", "NearestZone", "DistanceKm",
         "StopTime", "DayOfWeek", "StopDurationMin", "LongStop",
         "AfterHoursStop", "WeekendStop", "HighIdle", "SpeedKmh",
     ]

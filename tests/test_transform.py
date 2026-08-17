@@ -45,6 +45,7 @@ from scripts.transform import (
     build_device_summary,
     build_zone_summary,
 )
+from scripts.EpiWave import build_wave_lookup, enrich_with_wave, fetch_wave_lookup
 
 
 # ─────────────────────────────────────────────
@@ -227,6 +228,13 @@ class TestSummaries:
         assert len(ds) == 1
         assert ds["TotalTrips"].iloc[0] == 1
 
+    def test_device_summary_includes_wave_customer_when_present(self):
+        enriched = enrich_with_wave(self.gdf, {"d1": {"Wave": "W123", "Customer": "Customer A"}})
+        ds = build_device_summary(enriched)
+
+        assert ds["Wave"].iloc[0] == "W123"
+        assert ds["Customer"].iloc[0] == "Customer A"
+
     def test_zone_summary_has_one_row(self):
         zs = build_zone_summary(self.gdf)
         assert len(zs) == 1
@@ -236,3 +244,32 @@ class TestSummaries:
         empty = gpd.GeoDataFrame()
         assert build_device_summary(empty).empty
         assert build_zone_summary(empty).empty
+
+
+class TestWaveEnrichment:
+    def test_build_wave_lookup_uses_device_id(self):
+        rows = [{"DeviceID": " d1 ", "Wave_WaveNum": "W123", "CustomerName": "Customer A"}]
+
+        lookup = build_wave_lookup(rows)
+
+        assert lookup == {"d1": {"Wave": "W123", "Customer": "Customer A"}}
+
+    def test_enrich_with_wave_adds_columns(self):
+        df = pd.DataFrame([{"DeviceID": "d1"}, {"DeviceID": "d2"}])
+
+        enriched = enrich_with_wave(df, {"d1": {"Wave": "W123", "Customer": "Customer A"}})
+
+        assert list(enriched["Wave"]) == ["W123", ""]
+        assert list(enriched["Customer"]) == ["Customer A", ""]
+
+    def test_fetch_wave_lookup_joins_wave_track_rows(self, monkeypatch):
+        def fake_download_baq(baq_name):
+            if baq_name == "GeoTabIntegration-RR":
+                return [{"DeviceID": "d1", "Wave_WaveNum": "W123"}]
+            return [{"UD12_Key1": "W123", "CustomerName": "Customer A"}]
+
+        monkeypatch.setattr("scripts.EpiWave.download_baq", fake_download_baq)
+
+        lookup = fetch_wave_lookup()
+
+        assert lookup == {"d1": {"Wave": "W123", "Customer": "Customer A"}}
