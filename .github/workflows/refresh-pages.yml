@@ -49,6 +49,11 @@ jobs:
           GEOTAB_USERNAME: ${{ secrets.GEOTAB_USERNAME }}
           GEOTAB_PASSWORD: ${{ secrets.GEOTAB_PASSWORD }}
           GEOTAB_SERVER: ${{ secrets.GEOTAB_SERVER || 'my.geotab.com' }}
+          EPICOR_BASE_URL: ${{ secrets.EPICOR_BASE_URL || 'https://centralusdtapp35.epicorsaas.com/saas853/api/v1' }}
+          EPICOR_USERNAME: ${{ secrets.EPICOR_USERNAME }}
+          EPICOR_PASSWORD: ${{ secrets.EPICOR_PASSWORD }}
+          EPICOR_BAQ_INTEGRATION: ${{ secrets.EPICOR_BAQ_INTEGRATION || 'GeoTabIntegration-RR' }}
+          EPICOR_BAQ_WAVE_TRACK: ${{ secrets.EPICOR_BAQ_WAVE_TRACK || 'GeoWaveDeviceTrack' }}
           DAYS_BACK: ${{ github.event.inputs.days || '7' }}
           GENERATE_HTML_REPORT: "true"
           GENERATE_FOLIUM_MAP: "true"

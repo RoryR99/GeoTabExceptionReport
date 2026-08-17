@@ -18,6 +18,12 @@ WAVE_COLUMNS = ("Wave", "WaveNum", "Wave_WaveNum", "WaveNumber", "UD12_Key1", "C
 CUSTOMER_COLUMNS = ("Customer", "Customers", "CustomerName", "Customer_Name", "CustName", "Name", "Calculated_Customer")
 
 
+def _normalize_key(value) -> str:
+    if value is None:
+        return ""
+    return str(value).strip().casefold()
+
+
 def _first_value(row: dict, candidates: tuple[str, ...]) -> str:
     for column in candidates:
         value = row.get(column)
@@ -88,7 +94,7 @@ def build_wave_lookup(rows: list[dict]) -> dict[str, dict[str, str]]:
         if not device_id:
             continue
 
-        lookup[device_id] = {
+        lookup[_normalize_key(device_id)] = {
             "Wave": _first_matching_value(row, WAVE_COLUMNS, ("wave",)),
             "Customer": _first_matching_value(row, CUSTOMER_COLUMNS, ("customer", "cust")),
         }
@@ -130,7 +136,14 @@ def enrich_with_wave(df: pd.DataFrame, wave_lookup: dict[str, dict[str, str]]) -
     if enriched.empty or "DeviceID" not in enriched.columns:
         return enriched
 
-    device_ids = enriched["DeviceID"].astype(str).str.strip()
+    device_ids = enriched["DeviceID"].map(_normalize_key)
+    matched = device_ids.isin(wave_lookup.keys())
     enriched["Wave"] = device_ids.map(lambda value: wave_lookup.get(value, {}).get("Wave", ""))
     enriched["Customer"] = device_ids.map(lambda value: wave_lookup.get(value, {}).get("Customer", ""))
+    logger.info(
+        "Wave enrichment matched %s of %s trip row(s) across %s device(s).",
+        int(matched.sum()),
+        len(enriched),
+        int(enriched.loc[matched, "DeviceID"].nunique()) if matched.any() else 0,
+    )
     return enriched
